@@ -1,5 +1,5 @@
 [project]
-name = "mos-agreement"
+name = "mos_agreement"
 version = "0.1.0"
 description = ""
 authors = [
