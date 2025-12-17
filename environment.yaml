@@ -1,0 +1,20 @@
+name: mos-agreement
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - IPython
+  - jupyter
+  - numpy
+  - omegaconf
+  - plotly
+  - pre-commit
+  - poetry
+  - scipy
+  - sympy
+  - tqdm
+  - pip
+  - pip:
+    - kaleido
+    - pandas
+  
