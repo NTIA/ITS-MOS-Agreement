@@ -21,7 +21,7 @@ These results allow one to set expectations for the PCC and MSE that might be ac
 
 Create the conda environment and install the package with
 ```
-conda env create -f environment.yml
+conda env create -f environment.yaml
 conda activate mos-agreement
 pip install .
 ```
@@ -62,7 +62,6 @@ pip install .
         ```python
 		import mos_agreement as ma
         rmse, corr = ma.mos_data_bounds(mos_var=0.8, average_vote_var=1, n_v=10)
-		rmse, corr = ma.mos_data_binovotes_bounds(mos_mean=3.2, mos_var=0.8, n_v=10)
 		```
     
     - Estimate bounds from MOS statistics without vote variance information
