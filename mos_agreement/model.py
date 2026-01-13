@@ -15,7 +15,7 @@ def mos_data_bounds(mos_var, average_vote_var, n_v, s_L=1, s_H=5, n_s=5):
 
     Estimate performance bounds for RMSE and Correlation based on MOS data statistics.
 
-    Data driven bounds for datasets that include MOS and an associated variance value
+    Data-driven bounds for datasets that include MOS and an associated variance value
     for each MOS value.
 
     Parameters
@@ -53,7 +53,7 @@ def mos_data_binovotes_bounds(mos_mean, mos_var, n_v, s_L=1, s_H=5, n_s=5):
     Estimate performance bounds for RMSE and Correlation based on MOS data statistics
     under BinoVotes voting model.
 
-    Data driven bounds for datasets that include only MOS values with no associated vote
+    Data-driven bounds for datasets that include only MOS values with no associated vote
     variance information. Instead this function assumes vote variance according to a
     BinoVotes voting model.
 
@@ -66,11 +66,11 @@ def mos_data_binovotes_bounds(mos_mean, mos_var, n_v, s_L=1, s_H=5, n_s=5):
     n_v : int, float
         Average number of votes per file in the dataset.
     s_L : int, optional
-        Lower value of rating scale, by default 1
+        Lower value of rating scale, by default 1.
     s_H : int, optional
-        Highest value of the rating scale, by default 5
+        Highest value of the rating scale, by default 5.
     n_s : int, optional
-        Number of values in the rating scale, by default 5
+        Number of values in the rating scale, by default 5.
 
     Returns
     -------
@@ -108,11 +108,11 @@ def mos_data_binovotes_average_vote_var(mos_mean, mos_var, n_v, s_L=1, s_H=5, n_
     n_v : int, float
         Average number of votes per file in the dataset.
     s_L : int, optional
-        Lower value of rating scale, by default 1
+        Lower value of rating scale, by default 1.
     s_H : int, optional
-        Highest value of the rating scale, by default 5
+        Highest value of the rating scale, by default 5.
     n_s : int, optional
-        Number of values in the rating scale, by default 5
+        Number of values in the rating scale, by default 5.
 
     Returns
     -------
@@ -158,11 +158,11 @@ def quality_distribution_bounds(
     n_v : int, float
         Average number of votes per file in the dataset.
     s_L : int, optional
-        Lower value of rating scale, by default 1
+        Lower value of rating scale, by default 1.
     s_H : int, optional
-        Highest value of the rating scale, by default 5
+        Highest value of the rating scale, by default 5.
     n_s : int, optional
-        Number of values in the rating scale, by default 5
+        Number of values in the rating scale, by default 5.
 
     Returns
     -------
@@ -204,11 +204,11 @@ def quality_distribution_binovotes_bounds(
     n_v : int, float
         Average number of votes per file in the dataset.
     s_L : int, optional
-        Lower value of rating scale, by default 1
+        Lower value of rating scale, by default 1.
     s_H : int, optional
-        Highest value of rating scale, by default 5
+        Highest value of rating scale, by default 5.
     n_s : int, optional
-        Number of values in the rating scale, by default 5
+        Number of values in the rating scale, by default 5.
 
     Returns
     -------
@@ -246,13 +246,13 @@ def binovotes(quality, n_v, step=1, s_L=1, s_H=5, seed=None):
     n_v : int
         Number of votes per file.
     step : int, optional
-        Step size of rating scale, by default 1
+        Step size of rating scale, by default 1.
     s_L : int, optional
-        Lower value of rating scale, by default 1
+        Lower value of rating scale, by default 1.
     s_H : int, optional
-        Highest value of the rating scale, by default 5
+        Highest value of the rating scale, by default 5.
     seed : _type_, optional
-        Seed for random number generation, by default None
+        Seed for random number generation, by default None.
 
     Returns
     -------
@@ -283,12 +283,13 @@ def binomos(mos=True, *args, **kwargs):
     Parameters
     ----------
     mos : bool, optional
-        _description_, by default True
+        Flag to return MOS scores rather than individual votes via averaging, 
+        by default True.
 
     Returns
     -------
-    _type_
-        _description_
+    np.array
+        Generated MOS scores or individual votes.
     """
     votes = binovotes(*args, **kwargs)
     if mos:

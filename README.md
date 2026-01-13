@@ -32,7 +32,7 @@ pip install .
 - **Purpose**: Utilities to estimate bounds on agreement (RMSE and Pearson correlation)
 	between subjective MOS (mean opinion score) measurements and true quality, plus a
 	simple binomial voting model (BinoVotes) and its MOS wrapper (BinoMOS).
-- **Main functions:**
+- **Main functions**:
 	- **`mos_data_bounds`**: Estimate RMSE and correlation bounds from MOS variance,
 		average vote variance, and average number of votes per item.
 	- **`mos_data_binovotes_bounds`**: Convenience wrapper that assumes vote variance
