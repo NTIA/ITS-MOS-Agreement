@@ -283,7 +283,7 @@ def binomos(mos=True, *args, **kwargs):
     Parameters
     ----------
     mos : bool, optional
-        Flag to return MOS scores rather than individual votes via averaging, 
+        Flag to return MOS scores rather than individual votes via averaging,
         by default True.
 
     Returns
