@@ -3,17 +3,20 @@ This code corresponds to the paper "Bounds on Agreement between Subjective and O
 
 ## Abstract
 
-Objective estimators of multimedia quality are typically judged by comparing estimates with subjective "truth data," most often via Pearson correlation coefficient (PCC) or mean-squared error (MSE).
+Objective estimators of multimedia quality are typically judged by comparing estimates with subjective ``truth data,’’ most often via Pearson correlation coefficient (PCC) or mean-squared error (MSE).
 But subjective test results contain noise, so striving for a PCC of 1.0 or an MSE of 0.0 is neither realistic nor repeatable. 
 Numerous efforts have been made to acknowledge and appropriately accommodate subjective test noise in objective-subjective comparisons, typically resulting in new analysis frameworks and figures-of-merit. 
-We take a different approach. 
-By making only the most basic assumptions, we are able to derive bounds on PCC and MSE that can be expected for a subjective test. 
-Consistent with intuition, these bounds are functions of subjective vote variance.
+We take a different approach.  By making only the most basic assumptions, we are able to derive bounds on PCC and MSE that can be expected for a subjective test. 
 
-We also introduce a binomial-based model for subjective votes (BinoVotes) that naturally leads to a MOS model (BinoMOS) with multiple unique desirable properties. 
+Consistent with intuition, these bounds are functions of subjective vote variance.
+When a subjective test includes vote variance information, the calculation of the bounds is straight-forward, and in this case we say the resulting bounds are ``fully data-driven.''
+We also provide two options for calculating bounds in cases where vote variance information is not available.
+One option is to use vote variance information from other subjective tests that do provide such information, and the second option is to use a model for subjective votes.
+
+Thus we introduce a binomial-based model for subjective votes (BinoVotes) that naturally leads to a mean opinion score (MOS) model, named BinoMOS, with multiple unique desirable properties. 
 BinoMOS reproduces the discrete nature of MOS values and its dependence on the number of votes per file. 
-When subjective test results do not include vote variance information, these models provide that information for use in the PCC and MSE bounds. 
-We compare this modeling with data from 18 subjective tests. 
+This modeling provides vote variance information required by the derived PCC and MSE bounds and
+we compare this modeling with data from 18 subjective tests. 
 The modeling yields PCC and MSE bounds that agree very well with those found from the data directly. 
 These results allow one to set expectations for the PCC and MSE that might be achieved for any subjective test, even those where vote variance information is not available. 
 
