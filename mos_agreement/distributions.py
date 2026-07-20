@@ -136,6 +136,102 @@ class BetaPDF:
         return self.stat("v")
 
 
+class MaxUnimodalPDF:
+    def __init__(self):
+        """
+        MaxUnimodalPDF
+
+        Wrapper class for a maximum variance unimodal (MVU) discrete random
+        distribution. Used only to generate plots in corresponding paper.
+        """
+        self.v_L = 1
+        self.v_H = 5
+        self.n_s = 5
+        self.ratings = np.arange(self.v_L, self.v_H + 1)
+
+    def __call__(self, x):
+        return self.pmf(x)
+
+    def pdf(self, x):
+        return self.pmf(x)
+
+    def pmf(self, x):
+        if np.isnan(x):
+            return [np.nan] * self.n_s
+
+        if x < self.v_L or x > self.v_H:
+            return [0] * self.n_s
+
+        if x < self.v_H:
+            a_vals = self.ratings[self.ratings <= x]
+            b_vals = self.ratings[self.ratings > x]
+        else:
+            a_vals = self.ratings[self.ratings < x]
+            b_vals = self.ratings[self.ratings >= x]
+        exp_val = [np.sum(a_vals), np.sum(b_vals)]
+        prob_sum = [len(a_vals), len(b_vals)]
+        A = np.array([exp_val, prob_sum])
+        b = [x, 1]
+        probs = np.linalg.lstsq(
+            A,
+            b,
+        )[0]
+        a = probs[0]
+        b = probs[1]
+        pmf = [a for _ in a_vals] + [b for _ in b_vals]
+        return pmf
+
+    def mean(self, x):
+        return np.sum(self.ratings * self.pmf(x))
+
+    def var(self, x):
+        mean = self.mean(x)
+        pmf = self.pmf(x)
+        xx_val = np.sum(self.ratings**2 * pmf)
+        var = xx_val - mean**2
+        return var
+
+
+class MinVariancePDF:
+    def __init__(self):
+        """
+        MinVariancePDF
+
+        Wrapper class for a minimum variance discrete voting model, also called the
+        adjacent two-choice (ATC) voting model. Used only to generate plots in
+        corresponding paper.
+        """
+        self.v_L = 1
+        self.v_H = 5
+        self.n_s = 5
+        self.ratings = np.arange(self.v_L, self.v_H + 1)
+
+    def __call__(self, x):
+        return self.pmf(x)
+
+    def pdf(self, x):
+        return self.pmf(x)
+
+    def pmf(self, x):
+        xf = int(np.floor(x))
+        xc = int(np.ceil(x))
+        p = xc - xf
+        pmf = [0] * self.n_s
+        pmf[xf] = p
+        pmf[xc] = 1 - p
+        return pmf
+
+    def mean(self, x):
+        return np.sum(self.ratings * self.pmf(x))
+
+    def var(self, x):
+        mean = self.mean(x)
+        pmf = self.pmf(x)
+        xx_val = np.sum(self.ratings**2 * pmf)
+        var = xx_val - mean**2
+        return var
+
+
 class BinoVotes:
     def __init__(self, v_L, v_H, n_s, n_v, quality_pdf):
         """
