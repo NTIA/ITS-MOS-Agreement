@@ -1,5 +1,5 @@
 # ITS-MOS-Agreement
-This code corresponds to the paper "Bounds on Agreement between Subjective and Objective Measurements" by Jaden Pieper and Stephen D. Voran.
+This code corresponds to the paper J. Pieper and S. D. Voran, "Bounds on Agreement between Subjective and Objective Measurements," in IEEE Transactions on Multimedia, doi: 10.1109/TMM.2026.3712414.
 
 ## Abstract
 
