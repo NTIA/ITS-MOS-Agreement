@@ -8,6 +8,8 @@ import scipy.stats as stats
 
 from scipy.special import binom
 
+from .distributions import MaxUnimodalPDF
+
 
 def mos_data_bounds(mos_var, average_vote_var, n_v, s_L=1, s_H=5, n_s=5):
     """
@@ -233,6 +235,36 @@ def quality_distribution_binovotes_bounds(
 # ---------------------
 # BinoVotes Simulations
 # ---------------------
+def sim_setup(quality, seed):
+    """
+    sim_setup
+
+    Setup for vote simulations.
+
+    Parameters
+    ----------
+    quality : float, list, np.array
+        Quality values which votes converge to.
+    seed : int
+        Seed for random number generation.
+    Returns
+    -------
+    rng : np.random.Generator
+        Random number generator initialized with the given seed.
+    quality : np.array
+        Quality values converted to a numpy array.
+    """
+    if seed is not None:
+        rng = np.random.default_rng(seed)
+    else:
+        rng = np.random.default_rng()
+    if isinstance(quality, list):
+        quality = np.array(quality)
+    elif isinstance(quality, (int, float)):
+        quality = np.array([quality])
+    return rng, quality
+
+
 def binovotes(quality, n_v, step=1, s_L=1, s_H=5, seed=None):
     """
     binovotes
@@ -241,8 +273,8 @@ def binovotes(quality, n_v, step=1, s_L=1, s_H=5, seed=None):
 
     Parameters
     ----------
-    quality : float
-        Quality votes converge to.
+    quality : float, list, np.array
+        Quality values which votes converge to.
     n_v : int
         Number of votes per file.
     step : int, optional
@@ -251,18 +283,15 @@ def binovotes(quality, n_v, step=1, s_L=1, s_H=5, seed=None):
         Lower value of rating scale, by default 1.
     s_H : int, optional
         Highest value of the rating scale, by default 5.
-    seed : _type_, optional
+    seed : int, optional
         Seed for random number generation, by default None.
 
     Returns
     -------
-    _type_
-        _description_
+    np.array
+        A (n_v x len(quality)) array of votes generated according to BinoVotes model.
     """
-    if seed is not None:
-        np.random.seed(seed)
-    rng = np.random.default_rng()
-
+    rng, quality = sim_setup(quality, seed)
     # Define the binomial n value based off of the given scale
     scale = np.arange(s_L, (s_H + step), step)
     n_bino = len(scale) - 1
@@ -295,3 +324,167 @@ def binomos(mos=True, *args, **kwargs):
     if mos:
         votes = np.mean(votes, 0)
     return votes
+
+
+def mixed_behavior_votes(quality, vars, n_v, step=1, s_L=1, s_H=5, seed=None):
+    """
+    mixed_behavior_votes
+
+    Generate votes according to a mixed behavior model.
+
+    Parameters
+    ----------
+    quality : float
+        Quality votes converge to.
+    vars : float
+        Variance of the vote distribution.
+    n_v : int
+        Number of votes per file.
+    step : int, optional
+        Step size of rating scale, by default 1.
+    s_L : int, optional
+        Lower value of rating scale, by default 1.
+    s_H : int, optional
+        Highest value of the rating scale, by default 5.
+    seed : _type_, optional
+        Seed for random number generation, by default None.
+
+    Returns
+    -------
+    _type_
+        _description_
+    """
+    rng, quality = sim_setup(quality, seed)
+
+    # # Define the binomial n value based off of the given scale
+    # scale = np.arange(s_L, (s_H + step), step)
+    # n_bino = len(scale) - 1
+
+    # # Convert from quality scale to probability of successful trial scale
+    # p_bino = (quality - s_L) / (s_H - s_L)
+
+    # Mixed behavior model: combine BinoVotes with Adjacent Two-Choice or Maximum
+    # Variance Unimodal
+    # bino_votes = rng.binomial(n_bino, p_bino, (n_v, quality.size))
+    # gaussian_noise = rng.normal(0, np.sqrt(vars), (n_v, quality.size))
+    # TODO verify we are in the valid region
+    raise ValueError(
+        "Mixed behavior model not implemented yet. Please use binovotes or binomos"
+        " instead."
+    )
+    # return votes
+
+
+def effective_votes(n_bino, n_mos, n_s=5):
+    """
+    effective_votes
+
+    Effective number of votes per file when we generate BinoMOS using n_bino votes with
+    a MOS value that comes from n_mos votes per file.
+
+    Parameters
+    ----------
+    n_bino : int
+        Number of votes per file in binovotes draw
+    n_mos : int
+        Number of votes per file associated with MOS value used as "truth"
+    n_s : int, optional
+        Number of values in rating scale, by default 5
+    """
+    effective = 1 / (1 / n_bino + 1 / n_mos - 1 / (n_bino * n_mos * (n_s - 1)))
+    return effective
+
+
+def adjacent_two_choice(quality, n_v, step=1, s_L=1, s_H=5, seed=None):
+    """
+    adjacent_two_choice
+
+    Generate votes according to Adjacent Two-Choice (ATC) voting model.
+
+    Parameters
+    ----------
+    quality : float
+        Quality votes converge to.
+    n_v : int
+        Number of votes per file.
+    step : int, optional
+        Step size of rating scale, by default 1.
+    s_L : int, optional
+        Lower value of rating scale, by default 1.
+    s_H : int, optional
+        Highest value of the rating scale, by default 5.
+    seed : _type_, optional
+        Seed for random number generation, by default None.
+
+    Returns
+    -------
+    np.array
+        A (n_v x len(quality)) array of votes generated according to the Adjacent
+        Two-Choice (ATC) model.
+    """
+    rng, quality = sim_setup(quality, seed)
+
+    # Convert from original quality scale to integers scale (0,1,...,n_s-1), quality
+    # values can still be floats
+    int_scale = (quality - s_L) / step
+    # Lower neighbor for quality values
+    lower = np.floor(int_scale)
+    # Upper neighbor for quality values
+    upper = np.ceil(int_scale)
+    # Difference between quality on int scale and its upper (becomes probability of
+    # adding 1 to lower)
+    diff = upper - int_scale
+    # Draw probabilities, will determine if we add vote lower or upper
+    probs = rng.random(size=(n_v, int_scale.size))
+    # Determine if vote is upper or lower, false for upper, true for lower, e.g., 1 or 0
+    vote_upper = probs > diff
+    # Check if quality is on the rating scale directly (in this case it is an integer)
+    is_lower = int_scale == lower
+    # Set all votes for those quality values to lower (or upper, since they are the
+    # same)
+    vote_upper[:, is_lower] = False
+    # Get vote on the integer scale
+    vote_int_scale = lower + vote_upper
+    # Convert back to original quality scale
+    votes = vote_int_scale * step + s_L
+
+    return votes
+
+
+def maximum_variance_unimodal(quality, n_v, seed=None):
+    """
+    maximum_variance_unimodal
+
+    Generate votes according to Maximum Variance Unimodal (MVU) voting model.
+
+    Currently does not support ratings scales outside of the standard, integer 1-5
+    scale.
+
+    Parameters
+    ----------
+    quality : float
+        Quality votes converge to.
+    n_v : int
+        Number of votes per file.
+    seed : _type_, optional
+        Seed for random number generation, by default None.
+
+    Returns
+    -------
+    np.array
+        A (n_v x len(quality)) array of votes generated according to the Maximum
+        Variance Unimodal (MVU) model.
+    """
+    rng, quality = sim_setup(quality, seed)
+    # PDF generator
+    pdf_gen = MaxUnimodalPDF()
+    # Get PDF for each quality value
+    pdfs = np.array([pdf_gen.pdf(q) for q in quality])
+    # Define rating scale as [1, 2, 3, 4, 5]
+    scale = np.arange(1, 6)
+    # Generate votes from scale according to pdfs
+    votes = np.array([rng.choice(scale, size=n_v, p=pdf) for pdf in pdfs]).transpose()
+    return votes
+
+
+# TODO function to get mixture parameter given quality and variance
