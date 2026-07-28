@@ -1,3 +1,11 @@
 from .model import *
+
 # Distribution classes
-from .distributions import BinoVotes, UniformPDF, TriangularPDF, BetaPDF
+from .distributions import (
+    BinoVotes,
+    UniformPDF,
+    TriangularPDF,
+    BetaPDF,
+    MaxUnimodalPDF,
+    MinVariancePDF,
+)
