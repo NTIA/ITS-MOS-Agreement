@@ -351,28 +351,45 @@ def mixed_behavior_votes(quality, vars, n_v, step=1, s_L=1, s_H=5, seed=None):
 
     Returns
     -------
-    _type_
-        _description_
+    np.array
+        A (n_v x len(quality)) array of votes generated according to the mixed behavior
+        model.
     """
+    if not (s_L == 1 and s_H == 5 and step == 1):
+        raise ValueError(
+            "Mixed behavior model currently only supports standard 1-5 rating scale."
+        )
     rng, quality = sim_setup(quality, seed)
+    # Get alpha values for the given quality and variance
+    alpha_min, alpha_max, use_max = get_alpha(quality, vars)
 
-    # # Define the binomial n value based off of the given scale
-    # scale = np.arange(s_L, (s_H + step), step)
-    # n_bino = len(scale) - 1
+    # Initialize single alpha array
+    alpha = np.zeros_like(quality)
+    alpha[use_max] = alpha_max[use_max]
+    alpha[~use_max] = alpha_min[~use_max]
+    # Draw probabilities to determine behavior
+    behavior_probs = rng.random(size=len(quality))
 
-    # # Convert from quality scale to probability of successful trial scale
-    # p_bino = (quality - s_L) / (s_H - s_L)
+    # Determine when to use BinoVotes
+    use_bino = behavior_probs < alpha
 
-    # Mixed behavior model: combine BinoVotes with Adjacent Two-Choice or Maximum
-    # Variance Unimodal
-    # bino_votes = rng.binomial(n_bino, p_bino, (n_v, quality.size))
-    # gaussian_noise = rng.normal(0, np.sqrt(vars), (n_v, quality.size))
-    # TODO verify we are in the valid region
-    raise ValueError(
-        "Mixed behavior model not implemented yet. Please use binovotes or binomos"
-        " instead."
+    # Initialize votes array (n_v x len(quality))
+    votes = np.zeros((n_v, len(quality)), dtype=int)
+    # Generate votes according to BinoVotes for those that use BinoVotes
+    votes[:, use_bino] = binovotes(
+        quality=quality[use_bino], n_v=n_v, s_L=s_L, s_H=s_H, step=step, seed=seed
     )
-    # return votes
+    # Determine when to use atc vs mvu for remaining votes
+    use_alternate = ~use_bino
+    use_atc = use_alternate & ~use_max
+    use_mvu = use_alternate & use_max
+    votes[:, use_atc] = adjacent_two_choice(
+        quality=quality[use_atc], n_v=n_v, s_L=s_L, s_H=s_H, step=step, seed=seed
+    )
+    votes[:, use_mvu] = maximum_variance_unimodal(
+        quality=quality[use_mvu], n_v=n_v, seed=seed
+    )
+    return votes
 
 
 def effective_votes(n_bino, n_mos, n_s=5):
@@ -487,4 +504,166 @@ def maximum_variance_unimodal(quality, n_v, seed=None):
     return votes
 
 
-# TODO function to get mixture parameter given quality and variance
+def binovotes_variance(quality, s_L=1, s_H=5):
+    """
+    binovotes_variance
+
+    Assumes only integer values in rating scale, e.g., an individual cannot vote 1.5.
+
+    Parameters
+    ----------
+    quality : float
+        quality value.
+    s_L : int, optional
+        Lower limit of rating scale, by default 1
+    s_H : int, optional
+        Upper limit of rating scale, by default 5
+
+    Returns
+    -------
+    float
+        Variance of BinoVotes distribution for given quality value.
+    """
+    c = 1 / (s_H - s_L)
+    return c * (quality - s_L) * (s_H - quality)
+
+
+def minimum_vote_variance(quality):
+    """
+    minimum_vote_variance
+
+    Assumes only integer values in rating scale, e.g., an individual cannot vote 1.5.
+
+    Parameters
+    ----------
+    quality : float
+        quality value.
+
+    Returns
+    -------
+    float
+        Variance from adjacent two choice voting model for given quality value.
+    """
+    return (quality - np.floor(quality)) * (np.ceil(quality) - quality)
+
+
+def maximum_unimodal_vote_variance(quality, s_L=1, s_H=5):
+    """
+    maximum_unimodal_vote_variance
+
+    Parameters
+    ----------
+    quality : float
+        quality value.
+    s_L : int, optional
+        Lower limit of rating scale, by default 1
+    s_H : int, optional
+        Upper limit of rating scale, by default 5
+
+    Returns
+    -------
+    float
+        Variance from maximum variance unimodal voting model for given quality value.
+    """
+    # If mos is not a float or int it is a list or np.array and we need to call
+    # these individually
+    pdf = MaxUnimodalPDF()
+    if isinstance(quality, (float, int)):
+        var = pdf.var(quality, s_L=s_L, s_H=s_H)
+    else:
+        var = np.array([pdf.var(q) for q in quality])
+    return var
+
+
+def get_alpha(quality, var_target):
+    var_bv = binovotes_variance(quality=quality)
+    var_min = minimum_vote_variance(quality=quality)
+    var_max = maximum_unimodal_vote_variance(quality=quality)
+
+    alpha_min = (var_target - var_min) / (var_bv - var_min)
+    alpha_max = (var_target - var_max) / (var_bv - var_max)
+
+    # This can happen on the extreme edges of scale. Technically could be fixed by
+    # making `step` in `check_minimum_variance_violations` really small, but the
+    # differences are negligible. The violations limited to extreme edges of the scale
+    # (1, 1.001) and (4.999, 5) and violations are extremely small.
+    alpha_min[alpha_min < 0] = 0
+    # alpha_max[alpha_max < 0] = 0
+
+    # At edges of the scale variance is 0 so the alphas can become nan
+    alpha_min[np.isnan(alpha_min)] = 1
+    alpha_max[np.isnan(alpha_max)] = 1
+
+    use_max = var_target > var_bv
+
+    return alpha_min, alpha_max, use_max
+
+
+# ---------------------
+# Convenience functions
+# ---------------------
+def bin_vars(means, vars, n_votes, step=0.5):
+    """
+    bin_vars
+
+    Bin observed variance values.
+
+    Parameters
+    ----------
+    means : np.array
+        Observed MOS values, or mean values.
+    vars : np.array
+        Observed variances associated with each MOS value.
+    n_votes : np.array
+        Number of votes associated with each MOS value.
+    step : float, optional
+        Step size for binning, by default 0.5
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame containing binned MOS values, associated variances, number of files,
+        and number of votes.
+    """
+    # Define MOS binning array (treat edges of the scale separately)
+    mos_vals = np.concatenate([[1, 1.001], np.arange(1 + step, 5, step), [4.999, 5]])
+    delta = step / 2
+    stats_list = []
+    for mos in mos_vals:
+        # Get the indices for this mos value
+        if mos == 1 or mos == 5:
+            # Special case for ends of the scale, no binning
+            mean_ix = means == mos
+        elif mos == 1.001:
+            # Bin for (1, 1.25]
+            mean_ix = (1 < means) & (means <= mos + delta)
+        elif mos == 4.999:
+            # Bin for [4.75, 5)
+            mean_ix = (mos - delta <= means) & (means < 5)
+        else:
+            mean_ix = (mos - delta <= means) & (means < mos + delta)
+        mos_vs = means[mean_ix]
+        mos_v = np.mean(mos_vs)
+
+        # All the variances observed at this MOS value
+        mean_vars = vars[mean_ix]
+        # Average variance observed at this MOS value
+        var_mean = np.mean(mean_vars)
+
+        n_votes_for_mos = n_votes[mean_ix]
+        mean_n_votes = np.mean(n_votes_for_mos)
+
+        # Number of files that contribute to these values
+        n_points = np.sum(mean_ix)
+        # Save out values
+        mean_vals = {
+            # "dataset": data_name,
+            "mos": mos_v,
+            "data var": var_mean,
+            "n files": n_points,
+            "n_v": mean_n_votes,
+        }
+        stats_list.append(mean_vals)
+
+    var_df = pd.DataFrame(stats_list)
+    return var_df
