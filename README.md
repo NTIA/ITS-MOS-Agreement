@@ -96,19 +96,20 @@ This package provides utilities for estimating agreement bounds between subjecti
     rmse, corr = ma.quality_distribution_binovotes_bounds(quality_mean=3.2, quality_var=0.6, n_v=10)
     ```
 
-- **Simulate votes and get MOS**:
+- **Simulate votes using BinoVotes and get MOS**:
     ```python
     import numpy as np
     quality = np.array([3.0, 4.2])
     votes = ma.binovotes(quality, n_v=10)
-    mos = np.mean(votes, 0)
+    mos = np.mean(votes, axis=0)
     ```
 
-- **Generate votes using mixed behavior model**:
+- **Generate votes using mixed-behavior model**:
     ```python
     quality = np.array([3.5, 4.2])
 	target_variance = np.array([0.6, 0.5])
     votes = ma.mixed_behavior_votes(quality=quality, vars=target_variance, n_v=8)
+	mos = np.mean(votes, axis=0)
     ```
 
 See each module's docstrings for full details and additional parameters.
