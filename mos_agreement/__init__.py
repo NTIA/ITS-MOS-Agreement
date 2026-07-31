@@ -1,4 +1,4 @@
-from .model import *
+from .bounds import *
 from .sim_votes import *
 from .fit_data import *
 
