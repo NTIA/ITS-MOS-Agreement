@@ -340,7 +340,7 @@ def maximum_unimodal_vote_variance(quality, s_L=1, s_H=5):
     # these individually
     pdf = MaxUnimodalPDF()
     if isinstance(quality, (float, int)):
-        var = pdf.var(quality, s_L=s_L, s_H=s_H)
+        var = pdf.var(quality)
     else:
         var = np.array([pdf.var(q) for q in quality])
     return var
