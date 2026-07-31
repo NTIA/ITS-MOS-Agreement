@@ -1,7 +1,7 @@
 import numpy as np
 
 
-def mos_data_bounds(mos_var, average_vote_var, n_v, s_L=1, s_H=5, n_s=5):
+def mos_data_bounds(mos_var, vote_var, n_v, s_L=1, s_H=5, n_s=5):
     """
     mos_data_bounds
 
@@ -14,10 +14,14 @@ def mos_data_bounds(mos_var, average_vote_var, n_v, s_L=1, s_H=5, n_s=5):
     ----------
     mos_var : np.float
         Variance estimate of MOS distribution.
-    average_vote_var : np.float
-        Estimate of the average vote variance across the dataset.
-    n_v : int, float
-        Average number of votes per file in the dataset.
+    vote_var : np.array, np.float
+        Vote variance for each MOS value in the dataset. If passed in as a float this
+        should be the average vote variance across the dataset. Calculation is more
+        accurate if this is an array.
+    n_v : np.array, int, float
+        Number of votes per file for each file in the dataset. If passed in as a float
+        this should be the average number of votes per file in the dataset. Calculation
+        is more accurate if this is an array.
 
     Returns
     -------
@@ -31,9 +35,12 @@ def mos_data_bounds(mos_var, average_vote_var, n_v, s_L=1, s_H=5, n_s=5):
     ValueError
         _description_
     """
-    quality_var = mos_var - average_vote_var / n_v
+    # Get the standard error squared for each MOS value
+    vote_se2 = vote_var / n_v
+    average_vote_se2 = np.mean(vote_se2)
+    quality_var = mos_var - average_vote_se2
     rmse, corr = quality_distribution_bounds(
-        quality_var=quality_var, expected_vote_var=average_vote_var, n_v=n_v
+        quality_var=quality_var, vote_se2=average_vote_se2
     )
     return rmse, corr
 
@@ -80,7 +87,7 @@ def mos_data_binovotes_bounds(mos_mean, mos_var, n_v, s_L=1, s_H=5, n_s=5):
         mos_mean=mos_mean, mos_var=mos_var, n_v=n_v, s_L=s_L, s_H=s_H, n_s=n_s
     )
     rmse, corr = mos_data_bounds(
-        mos_var=mos_var, average_vote_var=binovotes_average_vote_var, n_v=n_v
+        mos_var=mos_var, vote_var=binovotes_average_vote_var, n_v=n_v
     )
     return rmse, corr
 
@@ -126,8 +133,7 @@ def mos_data_binovotes_average_vote_var(mos_mean, mos_var, n_v, s_L=1, s_H=5, n_
 
 def quality_distribution_bounds(
     quality_var,
-    expected_vote_var,
-    n_v,
+    vote_se2,
 ):
     """
     quality_distribution_bounds
@@ -144,17 +150,9 @@ def quality_distribution_bounds(
     ----------
     quality_var : np.float
         Variance value of quality distribution.
-    expecte_vote_var : np.float
-        Expected value of voting variance under a voting model across the entire voting
-        scale.
-    n_v : int, float
-        Average number of votes per file in the dataset.
-    s_L : int, optional
-        Lower value of rating scale, by default 1.
-    s_H : int, optional
-        Highest value of the rating scale, by default 5.
-    n_s : int, optional
-        Number of values in the rating scale, by default 5.
+    vote_se2 : np.float
+        Standard error squared of votes under a voting model across the entire voting
+        scale. Is equal to `E[v_r(y)] / n_v`.
 
     Returns
     -------
@@ -168,8 +166,8 @@ def quality_distribution_bounds(
     ValueError
         _description_
     """
-    rmse = np.sqrt(expected_vote_var / n_v)
-    corr = np.sqrt(quality_var / (quality_var + expected_vote_var / n_v))
+    rmse = np.sqrt(vote_se2)
+    corr = np.sqrt(quality_var / (quality_var + vote_se2))
     return rmse, corr
 
 
