@@ -2,7 +2,6 @@ import os
 import yaml
 
 import numpy as np
-import pandas as pd
 import scipy.integrate as integrate
 import scipy.stats as stats
 
@@ -152,26 +151,59 @@ class MaxUnimodalPDF:
     def __call__(self, x):
         return self.pmf(x)
 
-    def pdf(self, x):
-        return self.pmf(x)
-
     def pmf(self, x):
+        return self.pdf(x)
+
+    def pdf(self, x):
+        """
+        pmf
+
+        Generate the probability density function for the MVU.
+
+        Only opeartes on the scale [1, 2, 3, 4, 5].
+        For a value x s.t. 1 <= x <=5 the pdf is computed using a linear system to
+        satisfy the mean constraint.
+
+        For example if x=2.2 then the pdf has the form P=[a, a, b, b, b] such that
+        * sum(P) == 1 (valid probability distribution)
+        * sum(P * [1, 2, 3, 4, 5]) == x (correct mean)
+
+        Parameters
+        ----------
+        x : float
+            True quality
+
+        Returns
+        -------
+        list of float
+            Probability density function evaluated at x.
+        """
         if np.isnan(x):
             return [np.nan] * self.n_s
 
         if x < self.v_L or x > self.v_H:
+            # If x outside of range pmf is all 0
             return [0] * self.n_s
-
-        if x < self.v_H:
-            a_vals = self.ratings[self.ratings <= x]
-            b_vals = self.ratings[self.ratings > x]
-        else:
-            a_vals = self.ratings[self.ratings < x]
-            b_vals = self.ratings[self.ratings >= x]
+        if x == self.v_L:
+            # If x is at the lower bound, pmf is all 0 except for the first value
+            pmf = [1] + [0] * (self.n_s - 1)
+            return pmf
+        if x == self.v_H:
+            # If x is at the upper bound, pmf is all 0 except for the last value
+            pmf = [0] * (self.n_s - 1) + [1]
+            return pmf
+        # Which values have probability a
+        a_vals = self.ratings[self.ratings <= x]
+        # Which values have probability b
+        b_vals = self.ratings[self.ratings > x]
+        # Set up for the expected value (sum of a values, sum of b values)
         exp_val = [np.sum(a_vals), np.sum(b_vals)]
+        # Set up for the probability sum (number of a values, number of b values)
         prob_sum = [len(a_vals), len(b_vals)]
+        # Set up the least squares matrix
         A = np.array([exp_val, prob_sum])
         b = [x, 1]
+        # Get the probabilities a and b
         probs = np.linalg.lstsq(
             A,
             b,
