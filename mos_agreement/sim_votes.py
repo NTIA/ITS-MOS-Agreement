@@ -139,7 +139,7 @@ def mixed_behavior_votes(quality, vars, n_v, step=1, s_L=1, s_H=5, seed=None):
     alpha[use_max] = alpha_max[use_max]
     alpha[~use_max] = alpha_min[~use_max]
     # Draw probabilities to determine behavior
-    behavior_probs = rng.random(size=len(quality))
+    behavior_probs = rng.random(size=(n_v, len(quality)))
 
     # Determine when to use BinoVotes
     use_bino = behavior_probs < alpha
@@ -147,19 +147,47 @@ def mixed_behavior_votes(quality, vars, n_v, step=1, s_L=1, s_H=5, seed=None):
     # Initialize votes array (n_v x len(quality))
     votes = np.zeros((n_v, len(quality)), dtype=int)
     # Generate votes according to BinoVotes for those that use BinoVotes
-    votes[:, use_bino] = binovotes(
-        quality=quality[use_bino], n_v=n_v, s_L=s_L, s_H=s_H, step=step, seed=seed
-    )
-    # Determine when to use atc vs mvu for remaining votes
-    use_alternate = ~use_bino
-    use_atc = use_alternate & ~use_max
-    use_mvu = use_alternate & use_max
-    votes[:, use_atc] = adjacent_two_choice(
-        quality=quality[use_atc], n_v=n_v, s_L=s_L, s_H=s_H, step=step, seed=seed
-    )
-    votes[:, use_mvu] = maximum_variance_unimodal(
-        quality=quality[use_mvu], n_v=n_v, seed=seed
-    )
+    for col_ix, q in enumerate(quality):
+        # For each file, determine which votes use BinoVotes
+        file_use_bino = use_bino[:, col_ix]
+        # Count number of BinoVotes vs number alternative votes
+        n_bino = np.sum(file_use_bino)
+        n_alt = n_v - n_bino
+        if n_bino > 0:
+            # Generate the BinoVotes votes
+            votes[file_use_bino, col_ix] = binovotes(
+                quality=q,
+                n_v=n_bino,
+                s_L=s_L,
+                s_H=s_H,
+                step=step,
+                seed=seed,
+            ).squeeze()
+        if n_alt > 0:
+            # When to use alternative model
+            use_alternate = ~file_use_bino
+            # When to use ATC vs MVU
+            use_atc = use_alternate & ~use_max[col_ix]
+            use_mvu = use_alternate & use_max[col_ix]
+            n_atc = np.sum(use_atc)
+            n_mvu = np.sum(use_mvu)
+            if n_atc > 0:
+                # Generate the ATC votes
+                votes[use_atc, col_ix] = adjacent_two_choice(
+                    quality=q,
+                    n_v=n_atc,
+                    s_L=s_L,
+                    s_H=s_H,
+                    step=step,
+                    seed=seed,
+                ).squeeze()
+            if n_mvu > 0:
+                # Generate the MVU votes
+                votes[use_mvu, col_ix] = maximum_variance_unimodal(
+                    quality=q,
+                    n_v=n_mvu,
+                    seed=seed,
+                ).squeeze()
     return votes
 
 
