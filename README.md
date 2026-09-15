@@ -30,7 +30,7 @@ pip install .
 
 ## Description 
 
-This package provides utilities for estimating agreement bounds between subjective MOS (mean opinion score) measurements and objective quality scores. It includes voting models, distribution functions, and data fitting utilities.
+This package provides utilities that estimate bounds on the agreement between subjective MOS (mean opinion score) measurements and objective quality scores. It includes voting models, distribution functions, and data fitting utilities.
 
 ### Core Modules
 
@@ -67,7 +67,7 @@ This package provides utilities for estimating agreement bounds between subjecti
 **Fitting** (`fit_data.py`)
 - **Purpose**: Fit observed vote variance data to parametric variance models with constraints.
 - **Main functions**:
-	- **`fit_fourth_degree_poly`**: Fit a fourth-degree polynomial for vote variance as a function of MOS with automatic constraint enforcement to ensure the fit respects the minimum possible variance boundary. The fourth-degree polynomial is of the form $(x - 1)(5 - x)(w_0 + w_1(x-3)^2)$.
+	- **`fit_fourth_degree_poly`**: Fit a constrained fourth-degree polynomial for vote variance as a function of MOS with automatic constraint enforcement to ensure the fit respects the minimum possible variance boundary. The fourth-degree polynomial is of the form $(x - 1)(5 - x)(w_0 + w_1(x-3)^2)$.
 	- **`fourth_degree_least_squares`**: Perform weighted least-squares fitting of the variance polynomial.
 	- **`check_minimum_variance_violations`**: Verify that a fitted variance function does not violate minimum variance constraints.
 	- **`least_squares_weights`**: Compute weights for weighted least-squares fitting.

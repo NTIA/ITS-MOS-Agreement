@@ -160,7 +160,7 @@ class MaxUnimodalPDF:
 
         Generate the probability density function for the MVU.
 
-        Only opeartes on the scale [1, 2, 3, 4, 5].
+        Only operates on the scale [1, 2, 3, 4, 5].
         For a value x s.t. 1 <= x <=5 the pdf is computed using a linear system to
         satisfy the mean constraint.
 

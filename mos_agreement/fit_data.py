@@ -7,7 +7,7 @@ def fit_fourth_degree_poly(
     """
     fit_fourth_degree_poly
 
-    Fit a fourth-degree polynomial for vote variance as a function of MOS as
+    Fit a constrained fourth-degree polynomial for vote variance as a function of MOS as
     (mos - 1) * (5 - mos) * (scale * (mos - 3)**2 + shift).
     This ensures that the variance function is 0 at the ends of the scale and that it
     is symmetric about the middle of the scale (3).
@@ -16,7 +16,7 @@ def fit_fourth_degree_poly(
     function. If it does, it will use a bisection method to find the smallest weight
     value that must be applied to the data near the edge of the scale that ensures the
     fitted polynomial does not violate the minimum variance function. This relies on
-    the assumption that minimum variance violations are more likely to occur near the
+    the observation that minimum variance violations are more likely to occur near the
     edges of the scale, so by applying more weight to real data there (where violations
     are not possible), we can ensure that the resulting polynomial does not violate the
     admissible variance region.
@@ -31,7 +31,7 @@ def fit_fourth_degree_poly(
     mos : np.array
         MOS values
     vars : np.array
-        Variance values associated with MOS.
+        Variance values associated with MOS
     s_L : int, optional
         Lower bound of the MOS scale, by default 1
     s_H : int, optional
