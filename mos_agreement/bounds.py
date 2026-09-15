@@ -1,15 +1,7 @@
-import os
-import yaml
-
 import numpy as np
-import pandas as pd
-import scipy.integrate as integrate
-import scipy.stats as stats
-
-from scipy.special import binom
 
 
-def mos_data_bounds(mos_var, average_vote_var, n_v, s_L=1, s_H=5, n_s=5):
+def mos_data_bounds(mos_var, vote_var, n_v, s_L=1, s_H=5, n_s=5):
     """
     mos_data_bounds
 
@@ -22,10 +14,14 @@ def mos_data_bounds(mos_var, average_vote_var, n_v, s_L=1, s_H=5, n_s=5):
     ----------
     mos_var : np.float
         Variance estimate of MOS distribution.
-    average_vote_var : np.float
-        Estimate of the average vote variance across the dataset.
-    n_v : int, float
-        Average number of votes per file in the dataset.
+    vote_var : np.array, np.float
+        Vote variance for each MOS value in the dataset. If passed in as a float this
+        should be the average vote variance across the dataset. Calculation is more
+        accurate if this is an array.
+    n_v : np.array, int, float
+        Number of votes per file for each file in the dataset. If passed in as a float
+        this should be the average number of votes per file in the dataset. Calculation
+        is more accurate if this is an array.
 
     Returns
     -------
@@ -39,9 +35,12 @@ def mos_data_bounds(mos_var, average_vote_var, n_v, s_L=1, s_H=5, n_s=5):
     ValueError
         _description_
     """
-    quality_var = mos_var - average_vote_var / n_v
+    # Get the standard error squared for each MOS value
+    vote_se2 = vote_var / n_v
+    average_vote_se2 = np.mean(vote_se2)
+    quality_var = mos_var - average_vote_se2
     rmse, corr = quality_distribution_bounds(
-        quality_var=quality_var, expected_vote_var=average_vote_var, n_v=n_v
+        quality_var=quality_var, vote_se2=average_vote_se2
     )
     return rmse, corr
 
@@ -88,7 +87,7 @@ def mos_data_binovotes_bounds(mos_mean, mos_var, n_v, s_L=1, s_H=5, n_s=5):
         mos_mean=mos_mean, mos_var=mos_var, n_v=n_v, s_L=s_L, s_H=s_H, n_s=n_s
     )
     rmse, corr = mos_data_bounds(
-        mos_var=mos_var, average_vote_var=binovotes_average_vote_var, n_v=n_v
+        mos_var=mos_var, vote_var=binovotes_average_vote_var, n_v=n_v
     )
     return rmse, corr
 
@@ -134,8 +133,7 @@ def mos_data_binovotes_average_vote_var(mos_mean, mos_var, n_v, s_L=1, s_H=5, n_
 
 def quality_distribution_bounds(
     quality_var,
-    expected_vote_var,
-    n_v,
+    vote_se2,
 ):
     """
     quality_distribution_bounds
@@ -152,17 +150,9 @@ def quality_distribution_bounds(
     ----------
     quality_var : np.float
         Variance value of quality distribution.
-    expecte_vote_var : np.float
-        Expected value of voting variance under a voting model across the entire voting
-        scale.
-    n_v : int, float
-        Average number of votes per file in the dataset.
-    s_L : int, optional
-        Lower value of rating scale, by default 1.
-    s_H : int, optional
-        Highest value of the rating scale, by default 5.
-    n_s : int, optional
-        Number of values in the rating scale, by default 5.
+    vote_se2 : np.float
+        Standard error squared of votes under a voting model across the entire voting
+        scale. Is equal to `E[v_r(y)] / n_v`.
 
     Returns
     -------
@@ -176,8 +166,8 @@ def quality_distribution_bounds(
     ValueError
         _description_
     """
-    rmse = np.sqrt(expected_vote_var / n_v)
-    corr = np.sqrt(quality_var / (quality_var + expected_vote_var / n_v))
+    rmse = np.sqrt(vote_se2)
+    corr = np.sqrt(quality_var / (quality_var + vote_se2))
     return rmse, corr
 
 
@@ -228,70 +218,3 @@ def quality_distribution_binovotes_bounds(
     rmse = np.sqrt(mse)
     corr = np.sqrt(quality_var / (quality_var + mse))
     return rmse, corr
-
-
-# ---------------------
-# BinoVotes Simulations
-# ---------------------
-def binovotes(quality, n_v, step=1, s_L=1, s_H=5, seed=None):
-    """
-    binovotes
-
-    Generate votes according to BinoVotes model.
-
-    Parameters
-    ----------
-    quality : float
-        Quality votes converge to.
-    n_v : int
-        Number of votes per file.
-    step : int, optional
-        Step size of rating scale, by default 1.
-    s_L : int, optional
-        Lower value of rating scale, by default 1.
-    s_H : int, optional
-        Highest value of the rating scale, by default 5.
-    seed : _type_, optional
-        Seed for random number generation, by default None.
-
-    Returns
-    -------
-    _type_
-        _description_
-    """
-    if seed is not None:
-        np.random.seed(seed)
-    rng = np.random.default_rng()
-
-    # Define the binomial n value based off of the given scale
-    scale = np.arange(s_L, (s_H + step), step)
-    n_bino = len(scale) - 1
-
-    # Convert from quality scale to probability of successful trial scale
-    p_bino = (quality - s_L) / (s_H - s_L)
-    # BinoVotes
-    votes = s_L + step * rng.binomial(n_bino, p_bino, (n_v, quality.size))
-    return votes
-
-
-def binomos(mos=True, *args, **kwargs):
-    """
-    binomos
-
-    Convenient wrapper to generate MOS scores from BinoVotes.
-
-    Parameters
-    ----------
-    mos : bool, optional
-        Flag to return MOS scores rather than individual votes via averaging,
-        by default True.
-
-    Returns
-    -------
-    np.array
-        Generated MOS scores or individual votes.
-    """
-    votes = binovotes(*args, **kwargs)
-    if mos:
-        votes = np.mean(votes, 0)
-    return votes
