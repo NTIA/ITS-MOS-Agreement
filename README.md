@@ -1,7 +1,7 @@
 # ITS-MOS-Agreement
 This code corresponds to the paper J. Pieper and S. D. Voran, "Bounds on Agreement between Subjective and Objective Measurements," in IEEE Transactions on Multimedia, doi: 10.1109/TMM.2026.3712414.
 
-Additional follow on work supporting mixed-behavior voting models has been added, corresponding the the paper J. Pieper and S. D. Voran "A Mixed-Behavior Vote Model for Multimedia Subjective Quality Votes, Means, and Variances."
+Additional follow on work supporting mixed-behavior voting models has been added, corresponding the paper J. Pieper and S. D. Voran "A Mixed-Behavior Vote Model for Multimedia Subjective Quality Votes, Means, and Variances."
 
 ## Abstract
 
