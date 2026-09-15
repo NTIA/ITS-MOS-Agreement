@@ -2,7 +2,6 @@ import os
 import yaml
 
 import numpy as np
-import pandas as pd
 import scipy.integrate as integrate
 import scipy.stats as stats
 
@@ -134,6 +133,135 @@ class BetaPDF:
 
     def var(self):
         return self.stat("v")
+
+
+class MaxUnimodalPDF:
+    def __init__(self):
+        """
+        MaxUnimodalPDF
+
+        Wrapper class for a maximum variance unimodal (MVU) discrete random
+        distribution. Used only to generate plots in corresponding paper.
+        """
+        self.v_L = 1
+        self.v_H = 5
+        self.n_s = 5
+        self.ratings = np.arange(self.v_L, self.v_H + 1)
+
+    def __call__(self, x):
+        return self.pmf(x)
+
+    def pmf(self, x):
+        return self.pdf(x)
+
+    def pdf(self, x):
+        """
+        pmf
+
+        Generate the probability density function for the MVU.
+
+        Only operates on the scale [1, 2, 3, 4, 5].
+        For a value x s.t. 1 <= x <=5 the pdf is computed using a linear system to
+        satisfy the mean constraint.
+
+        For example if x=2.2 then the pdf has the form P=[a, a, b, b, b] such that
+        * sum(P) == 1 (valid probability distribution)
+        * sum(P * [1, 2, 3, 4, 5]) == x (correct mean)
+
+        Parameters
+        ----------
+        x : float
+            True quality
+
+        Returns
+        -------
+        list of float
+            Probability density function evaluated at x.
+        """
+        if np.isnan(x):
+            return [np.nan] * self.n_s
+
+        if x < self.v_L or x > self.v_H:
+            # If x outside of range pmf is all 0
+            return [0] * self.n_s
+        if x == self.v_L:
+            # If x is at the lower bound, pmf is all 0 except for the first value
+            pmf = [1] + [0] * (self.n_s - 1)
+            return pmf
+        if x == self.v_H:
+            # If x is at the upper bound, pmf is all 0 except for the last value
+            pmf = [0] * (self.n_s - 1) + [1]
+            return pmf
+        # Which values have probability a
+        a_vals = self.ratings[self.ratings <= x]
+        # Which values have probability b
+        b_vals = self.ratings[self.ratings > x]
+        # Set up for the expected value (sum of a values, sum of b values)
+        exp_val = [np.sum(a_vals), np.sum(b_vals)]
+        # Set up for the probability sum (number of a values, number of b values)
+        prob_sum = [len(a_vals), len(b_vals)]
+        # Set up the least squares matrix
+        A = np.array([exp_val, prob_sum])
+        b = [x, 1]
+        # Get the probabilities a and b
+        probs = np.linalg.lstsq(
+            A,
+            b,
+        )[0]
+        a = probs[0]
+        b = probs[1]
+        pmf = [a for _ in a_vals] + [b for _ in b_vals]
+        return pmf
+
+    def mean(self, x):
+        return np.sum(self.ratings * self.pmf(x))
+
+    def var(self, x):
+        mean = self.mean(x)
+        pmf = self.pmf(x)
+        xx_val = np.sum(self.ratings**2 * pmf)
+        var = xx_val - mean**2
+        return var
+
+
+class MinVariancePDF:
+    def __init__(self):
+        """
+        MinVariancePDF
+
+        Wrapper class for a minimum variance discrete voting model, also called the
+        adjacent two-choice (ATC) voting model. Used only to generate plots in
+        corresponding paper.
+        """
+        self.v_L = 1
+        self.v_H = 5
+        self.n_s = 5
+        self.ratings = np.arange(self.v_L, self.v_H + 1)
+
+    def __call__(self, x):
+        return self.pmf(x)
+
+    def pdf(self, x):
+        return self.pmf(x)
+
+    def pmf(self, x):
+        xf = int(np.floor(x))
+        xc = int(np.ceil(x))
+        p = xc - xf
+        pmf = [0] * self.n_s
+        pmf[xf] = p
+        pmf[xc] = 1 - p
+        return pmf
+
+    def mean(self, x):
+        return np.sum(self.ratings * self.pmf(x))
+
+    def var(self, x):
+        mean = self.mean(x)
+        pmf = self.pmf(x)
+        xx_val = np.sum(self.ratings**2 * pmf)
+        var = xx_val - mean**2
+        return var
 
 
 class BinoVotes:
