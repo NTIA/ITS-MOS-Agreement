@@ -136,16 +136,16 @@ class BetaPDF:
 
 
 class MaxUnimodalPDF:
-    def __init__(self):
+    def __init__(self, v_L=1, v_H=5, n_s=5):
         """
         MaxUnimodalPDF
 
         Wrapper class for a maximum variance unimodal (MVU) discrete random
         distribution. Used only to generate plots in corresponding paper.
         """
-        self.v_L = 1
-        self.v_H = 5
-        self.n_s = 5
+        self.v_L = v_L
+        self.v_H = v_H
+        self.n_s = n_s
         self.ratings = np.arange(self.v_L, self.v_H + 1)
 
     def __call__(self, x):
