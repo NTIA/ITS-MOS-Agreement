@@ -28,6 +28,23 @@ conda activate mos-agreement
 pip install .
 ```
 
+## Tests
+
+If the `mos-agreement` environment was created before the test tools were added, update it:
+
+```bash
+conda env update -n mos-agreement -f environment.yaml
+```
+
+Then run the test suite with coverage reporting:
+
+```bash
+conda run -n mos-agreement python -m pytest --cov=mos_agreement --cov-report=term-missing tests
+```
+
+The test and coverage tools are included in `environment.yaml` and the package's
+`test` optional dependency group.
+
 ## Description 
 
 This package provides utilities that estimate bounds on the agreement between subjective MOS (mean opinion score) measurements and objective quality scores. It includes voting models, distribution functions, and data fitting utilities.

@@ -31,7 +31,7 @@ def sim_setup(quality, seed):
         rng = np.random.default_rng()
     if isinstance(quality, list):
         quality = np.array(quality)
-    elif isinstance(quality, (int, float)):
+    elif isinstance(quality, (int, float, np.number)):
         quality = np.array([quality])
     return rng, quality
 

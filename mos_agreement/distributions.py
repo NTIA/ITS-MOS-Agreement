@@ -248,12 +248,12 @@ class MinVariancePDF:
         return self.pmf(x)
 
     def pmf(self, x):
-        xf = int(np.floor(x))
-        xc = int(np.ceil(x))
-        p = xc - xf
+        xf = int(np.floor(x) - self.v_L)
+        xc = int(np.ceil(x) - self.v_L)
+        p = x - np.floor(x)
         pmf = [0] * self.n_s
-        pmf[xf] = p
-        pmf[xc] = 1 - p
+        pmf[xf] = 1 - p
+        pmf[xc] += p
         return pmf
 
     def mean(self, x):

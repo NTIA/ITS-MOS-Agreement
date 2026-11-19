@@ -9,6 +9,8 @@ dependencies:
   - omegaconf
   - plotly
   - pre-commit
+  - pytest
+  - pytest-cov
   - poetry
   - scipy
   - sympy

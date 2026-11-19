@@ -300,21 +300,22 @@ class TestSimVotesModule(unittest.TestCase):
 
     def test_bin_vars_output_structure(self):
         """Test bin_vars output structure and content"""
-        means = np.array([1.0, 1.5, 2.5, 3.0, 3.5, 4.5, 5.0])
-        vars = np.array([0.1, 0.2, 0.3, 0.4, 0.3, 0.2, 0.1])
-        n_votes = np.array([5, 5, 5, 5, 5, 5, 5])
+        means = np.array(
+            [1.0, 1.001, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 4.999, 5.0]
+        )
+        vars = np.linspace(0.1, 0.5, len(means))
+        n_votes = np.full(len(means), 5)
 
         binned = ma.bin_vars(means=means, vars=vars, n_votes=n_votes, step=0.5)
 
-        # Should return a list
         self.assertIsInstance(binned, list)
-        # Each item should be a dict with required keys
+        self.assertEqual(len(binned), len(means))
         for item in binned:
-            self.assertIsInstance(item, dict)
-            self.assertIn("mos", item)
-            self.assertIn("data var", item)
-            self.assertIn("n files", item)
-            self.assertIn("n_v", item)
+            self.assertEqual(set(item), {"mos", "data var", "n files", "n_v"})
+            self.assertEqual(item["n files"], 1)
+            self.assertTrue(np.isfinite(item["mos"]))
+            self.assertTrue(np.isfinite(item["data var"]))
+            self.assertEqual(item["n_v"], 5)
 
     def test_mixed_behavior_votes_output_shape(self):
         """Test mixed_behavior_votes output shape and range"""
@@ -501,18 +502,15 @@ class TestDistributionsModule(unittest.TestCase):
     def test_min_variance_pdf_integer_quality(self):
         """Test MinVariancePDF at integer quality values"""
         pdf = ma.MinVariancePDF()
-        # For quality 3.0: floor=3, ceil=3, so pmf[3] gets all probability
         pmf = pdf.pmf(3.0)
-        # This corresponds to rating value 4 (index 3 in 0-based, but ratings [1,2,3,4,5])
-        expected = [0, 0, 0, 1, 0]
+        expected = [0, 0, 1, 0, 0]
         self.assertEqual(pmf, expected)
 
     def test_min_variance_pdf_fractional_quality(self):
         """Test MinVariancePDF at fractional quality values"""
         pdf = ma.MinVariancePDF()
         pmf = pdf.pmf(3.5)
-        # Should be probability distribution summing to 1
-        self.assertAlmostEqual(np.sum(pmf), 1.0)
+        self.assertEqual(pmf, [0, 0, 0.5, 0.5, 0])
 
     def test_binovotes_initialization(self):
         """Test BinoVotes initialization"""
