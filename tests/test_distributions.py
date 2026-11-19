@@ -29,6 +29,20 @@ def test_max_unimodal_pdf_preserves_mean_and_probability():
         assert np.isclose(pdf.mean(quality), quality)
 
 
+def test_max_unimodal_pdf_vectorized_methods_match_scalar_reference():
+    """Compare batched PMFs and variances with the scalar reference over the scale."""
+    pdf = ma.MaxUnimodalPDF()
+    quality = np.concatenate(([0], np.arange(1, 5, 0.01), [5, 6, np.nan]))
+
+    vectorized_pmf = pdf.pdf_many(quality)
+    vectorized_var = pdf.var_many(quality)
+    scalar_pmf = np.array([pdf.pdf(q) for q in quality])
+    scalar_var = np.array([pdf.var(q) for q in quality])
+
+    np.testing.assert_allclose(vectorized_pmf, scalar_pmf, equal_nan=True)
+    np.testing.assert_allclose(vectorized_var, scalar_var, equal_nan=True)
+
+
 def test_max_unimodal_pdf_outside_support_and_nan():
     pdf = ma.MaxUnimodalPDF()
 

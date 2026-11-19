@@ -97,6 +97,44 @@ def binomos(mos=True, *args, **kwargs):
     return votes
 
 
+def _sample_discrete_votes(rng, pmfs, n_v):
+    """Draw ``n_v`` category indices for each row of per-item PMFs.
+
+    The PMF array is shaped ``(n_items, n_categories)``; the result is shaped
+    ``(n_v, n_items)``. Inverse-CDF sampling lets all items share one batched
+    random draw instead of calling ``Generator.choice`` once per item.
+    """
+    pmfs = np.asarray(pmfs, dtype=float)
+    if not np.all(np.isfinite(pmfs)):
+        raise ValueError("probabilities contain NaN")
+    if np.any(pmfs < 0) or not np.all(np.isclose(pmfs.sum(axis=1), 1, atol=1e-8)):
+        raise ValueError("probabilities do not sum to 1")
+
+    cumulative = np.cumsum(pmfs, axis=1)
+    random_values = rng.random((n_v, pmfs.shape[0]))
+    # Count CDF cutoffs at or below each draw to obtain its category index.
+    indices = np.sum(random_values[:, :, None] >= cumulative[None, :, :], axis=2)
+    # Guard against a final cumulative probability a few ulps below one.
+    return np.minimum(indices, pmfs.shape[1] - 1)
+
+
+def _sample_adjacent_two_choice(rng, quality, step=1, s_L=1):
+    """Draw one ATC rating per quality entry, preserving the input array shape."""
+    int_scale = (np.asarray(quality) - s_L) / step
+    lower = np.floor(int_scale)
+    upper_diff = np.ceil(int_scale) - int_scale
+    # The upper neighbor is chosen with probability equal to the fractional part.
+    is_upper = (rng.random(int_scale.shape) > upper_diff) & (int_scale != lower)
+    return s_L + step * (lower + is_upper)
+
+
+def _sample_maximum_variance_unimodal(rng, quality, n_v):
+    """Return batched MVU ratings for each quality using the shared PMF sampler."""
+    pdf_gen = MaxUnimodalPDF()
+    indices = _sample_discrete_votes(rng, pdf_gen.pdf_many(quality), n_v)
+    return np.arange(1, 6)[indices]
+
+
 def mixed_behavior_votes(quality, vars, n_v, step=1, s_L=1, s_H=5, seed=None):
     """
     mixed_behavior_votes
@@ -105,10 +143,10 @@ def mixed_behavior_votes(quality, vars, n_v, step=1, s_L=1, s_H=5, seed=None):
 
     Parameters
     ----------
-    quality : float
-        Quality votes converge to.
-    vars : float
-        Variance of the vote distribution.
+    quality : float, list, np.array
+        Per-item quality values that the votes converge to.
+    vars : float, list, np.array
+        Target vote variance for each item.
     n_v : int
         Number of votes per file.
     step : int, optional
@@ -125,6 +163,12 @@ def mixed_behavior_votes(quality, vars, n_v, step=1, s_L=1, s_H=5, seed=None):
     np.array
         A (n_v x len(quality)) array of votes generated according to the mixed behavior
         model.
+
+    Notes
+    -----
+    Each vote uses BinoVotes with a quality- and target-variance-dependent
+    probability. Remaining votes use ATC when the target variance is below the
+    BinoVotes variance and MVU when it is above. Samples are batched by model.
     """
     if not (s_L == 1 and s_H == 5 and step == 1):
         raise ValueError(
@@ -134,60 +178,41 @@ def mixed_behavior_votes(quality, vars, n_v, step=1, s_L=1, s_H=5, seed=None):
     # Get alpha values for the given quality and variance
     alpha_min, alpha_max, use_max = get_alpha(quality, vars)
 
-    # Initialize single alpha array
-    alpha = np.zeros_like(quality)
+    # Keep fractional mixture probabilities when quality inputs are integers.
+    alpha = np.zeros_like(quality, dtype=float)
     alpha[use_max] = alpha_max[use_max]
     alpha[~use_max] = alpha_min[~use_max]
-    # Draw probabilities to determine behavior
     behavior_probs = rng.random(size=(n_v, len(quality)))
 
-    # Determine when to use BinoVotes
+    # Choose the model independently for each vote, with the alternate model
+    # selected by whether that item's target variance is above the BinoVotes range.
     use_bino = behavior_probs < alpha
-
-    # Initialize votes array (n_v x len(quality))
+    use_alternate = ~use_bino
+    use_atc = use_alternate & ~use_max[None, :]
+    use_mvu = use_alternate & use_max[None, :]
     votes = np.zeros((n_v, len(quality)), dtype=int)
-    # Generate votes according to BinoVotes for those that use BinoVotes
-    for col_ix, q in enumerate(quality):
-        # For each file, determine which votes use BinoVotes
-        file_use_bino = use_bino[:, col_ix]
-        # Count number of BinoVotes vs number alternative votes
-        n_bino = np.sum(file_use_bino)
-        n_alt = n_v - n_bino
-        if n_bino > 0:
-            # Generate the BinoVotes votes
-            votes[file_use_bino, col_ix] = binovotes(
-                quality=q,
-                n_v=n_bino,
-                s_L=s_L,
-                s_H=s_H,
-                step=step,
-                seed=seed,
-            ).squeeze()
-        if n_alt > 0:
-            # When to use alternative model
-            use_alternate = ~file_use_bino
-            # When to use ATC vs MVU
-            use_atc = use_alternate & ~use_max[col_ix]
-            use_mvu = use_alternate & use_max[col_ix]
-            n_atc = np.sum(use_atc)
-            n_mvu = np.sum(use_mvu)
-            if n_atc > 0:
-                # Generate the ATC votes
-                votes[use_atc, col_ix] = adjacent_two_choice(
-                    quality=q,
-                    n_v=n_atc,
-                    s_L=s_L,
-                    s_H=s_H,
-                    step=step,
-                    seed=seed,
-                ).squeeze()
-            if n_mvu > 0:
-                # Generate the MVU votes
-                votes[use_mvu, col_ix] = maximum_variance_unimodal(
-                    quality=q,
-                    n_v=n_mvu,
-                    seed=seed,
-                ).squeeze()
+
+    rows, columns = np.nonzero(use_bino)
+    if rows.size:
+        n_bino = len(np.arange(s_L, s_H + step, step)) - 1
+        p_bino = (quality[columns] - s_L) / (s_H - s_L)
+        votes[rows, columns] = s_L + step * rng.binomial(n_bino, p_bino)
+
+    rows, columns = np.nonzero(use_atc)
+    if rows.size:
+        votes[rows, columns] = _sample_adjacent_two_choice(
+            rng, quality[columns], step=step, s_L=s_L
+        )
+
+    mvu_columns = np.flatnonzero(np.any(use_mvu, axis=0))
+    if mvu_columns.size:
+        # Generate one batched MVU matrix, then keep only its selected vote cells.
+        samples = _sample_maximum_variance_unimodal(
+            rng, quality[mvu_columns], n_v
+        )
+        rows, local_columns = np.nonzero(use_mvu[:, mvu_columns])
+        votes[rows, mvu_columns[local_columns]] = samples[rows, local_columns]
+
     return votes
 
 
@@ -219,8 +244,8 @@ def adjacent_two_choice(quality, n_v, step=1, s_L=1, s_H=5, seed=None):
 
     Parameters
     ----------
-    quality : float
-        Quality votes converge to.
+    quality : float, list, np.array
+        Per-item quality values that the votes converge to.
     n_v : int
         Number of votes per file.
     step : int, optional
@@ -235,36 +260,12 @@ def adjacent_two_choice(quality, n_v, step=1, s_L=1, s_H=5, seed=None):
     Returns
     -------
     np.array
-        A (n_v x len(quality)) array of votes generated according to the Adjacent
-        Two-Choice (ATC) model.
+        A ``(n_v, len(quality))`` array of votes generated according to ATC.
     """
     rng, quality = sim_setup(quality, seed)
-
-    # Convert from original quality scale to integers scale (0,1,...,n_s-1), quality
-    # values can still be floats
-    int_scale = (quality - s_L) / step
-    # Lower neighbor for quality values
-    lower = np.floor(int_scale)
-    # Upper neighbor for quality values
-    upper = np.ceil(int_scale)
-    # Difference between quality on int scale and its upper (becomes probability of
-    # adding 1 to lower)
-    diff = upper - int_scale
-    # Draw probabilities, will determine if we add vote lower or upper
-    probs = rng.random(size=(n_v, int_scale.size))
-    # Determine if vote is upper or lower, false for upper, true for lower, e.g., 1 or 0
-    vote_upper = probs > diff
-    # Check if quality is on the rating scale directly (in this case it is an integer)
-    is_lower = int_scale == lower
-    # Set all votes for those quality values to lower (or upper, since they are the
-    # same)
-    vote_upper[:, is_lower] = False
-    # Get vote on the integer scale
-    vote_int_scale = lower + vote_upper
-    # Convert back to original quality scale
-    votes = vote_int_scale * step + s_L
-
-    return votes
+    # Broadcast all items across the vote axis and use the same kernel as mixed votes.
+    vote_quality = np.broadcast_to(quality, (n_v, quality.size))
+    return _sample_adjacent_two_choice(rng, vote_quality, step=step, s_L=s_L)
 
 
 def maximum_variance_unimodal(quality, n_v, seed=None):
@@ -278,8 +279,8 @@ def maximum_variance_unimodal(quality, n_v, seed=None):
 
     Parameters
     ----------
-    quality : float
-        Quality votes converge to.
+    quality : float, list, np.array
+        Per-item quality values that the votes converge to.
     n_v : int
         Number of votes per file.
     seed : _type_, optional
@@ -288,19 +289,10 @@ def maximum_variance_unimodal(quality, n_v, seed=None):
     Returns
     -------
     np.array
-        A (n_v x len(quality)) array of votes generated according to the Maximum
-        Variance Unimodal (MVU) model.
+        A ``(n_v, len(quality))`` array of MVU ratings.
     """
     rng, quality = sim_setup(quality, seed)
-    # PDF generator
-    pdf_gen = MaxUnimodalPDF()
-    # Get PDF for each quality value
-    pdfs = np.array([pdf_gen.pdf(q) for q in quality])
-    # Define rating scale as [1, 2, 3, 4, 5]
-    scale = np.arange(1, 6)
-    # Generate votes from scale according to pdfs
-    votes = np.array([rng.choice(scale, size=n_v, p=pdf) for pdf in pdfs]).transpose()
-    return votes
+    return _sample_maximum_variance_unimodal(rng, quality, n_v)
 
 
 def binovotes_variance(quality, s_L=1, s_H=5):
@@ -352,8 +344,8 @@ def maximum_unimodal_vote_variance(quality, s_L=1, s_H=5):
 
     Parameters
     ----------
-    quality : float
-        quality value.
+    quality : float, list, np.array
+        Quality value or array of quality values.
     s_L : int, optional
         Lower limit of rating scale, by default 1
     s_H : int, optional
@@ -361,16 +353,15 @@ def maximum_unimodal_vote_variance(quality, s_L=1, s_H=5):
 
     Returns
     -------
-    float
-        Variance from maximum variance unimodal voting model for given quality value.
+    float or np.array
+        Variance from the maximum variance unimodal voting model, matching the
+        scalar or array form of ``quality``.
     """
-    # If mos is not a float or int it is a list or np.array and we need to call
-    # these individually
     pdf = MaxUnimodalPDF()
-    if isinstance(quality, (float, int)):
+    if isinstance(quality, (float, int, np.number)):
         var = pdf.var(quality)
     else:
-        var = np.array([pdf.var(q) for q in quality])
+        var = pdf.var_many(quality)
     return var
 
 
