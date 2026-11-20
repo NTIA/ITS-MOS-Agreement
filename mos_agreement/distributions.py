@@ -136,17 +136,18 @@ class BetaPDF:
 
 
 class MaxUnimodalPDF:
-    def __init__(self):
+    def __init__(self, v_L=1, v_H=5, n_s=5):
         """
         MaxUnimodalPDF
 
         Wrapper class for a maximum variance unimodal (MVU) discrete random
         distribution. Used only to generate plots in corresponding paper.
         """
-        self.v_L = 1
-        self.v_H = 5
-        self.n_s = 5
-        self.ratings = np.arange(self.v_L, self.v_H + 1)
+        self.v_L = v_L
+        self.v_H = v_H
+        self.n_s = n_s
+        self.step = (self.v_H - self.v_L) / (self.n_s - 1)
+        self.ratings = np.linspace(self.v_L, self.v_H, self.n_s)
 
     def __call__(self, x):
         return self.pmf(x)
@@ -213,6 +214,53 @@ class MaxUnimodalPDF:
         pmf = [a for _ in a_vals] + [b for _ in b_vals]
         return pmf
 
+    def pdf_many(self, x):
+        """Return one MVU PMF per quality, with shape ``x.shape + (n_s,)``.
+
+        For each interior quality, ratings at or below it share one probability,
+        and ratings above it share another. The two probabilities satisfy the
+        normalization and expected-quality constraints.
+        """
+        quality = np.asarray(x, dtype=float)
+        flat_quality = quality.ravel()
+        pmfs = np.zeros((flat_quality.size, self.n_s), dtype=float)
+
+        # Match the scalar PMF's handling of NaNs, endpoints, and out-of-range values.
+        nan_mask = np.isnan(flat_quality)
+        pmfs[nan_mask] = np.nan
+
+        low_mask = flat_quality == self.v_L
+        high_mask = flat_quality == self.v_H
+        pmfs[low_mask, 0] = 1
+        pmfs[high_mask, -1] = 1
+
+        interior_mask = (flat_quality > self.v_L) & (flat_quality < self.v_H)
+        if np.any(interior_mask):
+            interior_quality = flat_quality[interior_mask]
+            # Prefix sums give each quality's lower- and upper-rating groups.
+            lower_count = np.searchsorted(
+                self.ratings, interior_quality, side="right"
+            )
+            ratings_cumsum = np.concatenate(([0], np.cumsum(self.ratings)))
+            lower_sum = ratings_cumsum[lower_count]
+            upper_sum = np.sum(self.ratings) - lower_sum
+            upper_count = self.n_s - lower_count
+            # Solve normalization and mean constraints for both group probabilities.
+            determinant = lower_sum * upper_count - upper_sum * lower_count
+            lower_probability = (
+                interior_quality * upper_count - upper_sum
+            ) / determinant
+            upper_probability = (
+                lower_sum - lower_count * interior_quality
+            ) / determinant
+            pmfs[interior_mask] = np.where(
+                self.ratings[None, :] <= interior_quality[:, None],
+                lower_probability[:, None],
+                upper_probability[:, None],
+            )
+
+        return pmfs.reshape(quality.shape + (self.n_s,))
+
     def mean(self, x):
         return np.sum(self.ratings * self.pmf(x))
 
@@ -222,6 +270,13 @@ class MaxUnimodalPDF:
         xx_val = np.sum(self.ratings**2 * pmf)
         var = xx_val - mean**2
         return var
+
+    def var_many(self, x):
+        """Return MVU variances with the same shape as the quality input ``x``."""
+        pmfs = self.pdf_many(x)
+        mean = np.sum(pmfs * self.ratings, axis=-1)
+        second_moment = np.sum(pmfs * self.ratings**2, axis=-1)
+        return second_moment - mean**2
 
 
 class MinVariancePDF:
@@ -245,12 +300,12 @@ class MinVariancePDF:
         return self.pmf(x)
 
     def pmf(self, x):
-        xf = int(np.floor(x))
-        xc = int(np.ceil(x))
-        p = xc - xf
+        xf = int(np.floor(x) - self.v_L)
+        xc = int(np.ceil(x) - self.v_L)
+        p = x - np.floor(x)
         pmf = [0] * self.n_s
-        pmf[xf] = p
-        pmf[xc] = 1 - p
+        pmf[xf] = 1 - p
+        pmf[xc] += p
         return pmf
 
     def mean(self, x):

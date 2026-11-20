@@ -181,6 +181,8 @@ def fourth_degree_least_squares(mos, vars, p=2, s_L=1, s_H=5, weights=None):
     shift : float
         Shift parameter of the fitted polynomial
     """
+    if weights is None:
+        weights = np.ones_like(mos)
     weights = np.diag(weights)
     midpoint = (s_L + s_H) / 2
     A = np.array(

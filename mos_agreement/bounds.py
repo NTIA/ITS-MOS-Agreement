@@ -1,7 +1,7 @@
 import numpy as np
 
 
-def mos_data_bounds(mos_var, vote_var, n_v, s_L=1, s_H=5, n_s=5):
+def mos_data_bounds(mos_var, vote_var, n_v):
     """
     mos_data_bounds
 
