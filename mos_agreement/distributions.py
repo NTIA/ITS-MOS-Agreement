@@ -146,10 +146,8 @@ class MaxUnimodalPDF:
         self.v_L = v_L
         self.v_H = v_H
         self.n_s = n_s
-        # machine epsilon to avoid floating point issues
-        eps = np.finfo(float).eps
         self.step = (self.v_H - self.v_L) / (self.n_s - 1)
-        self.ratings = np.arange(self.v_L, self.v_H + self.step - eps, self.step)
+        self.ratings = np.linspace(self.v_L, self.v_H, self.n_s)
 
     def __call__(self, x):
         return self.pmf(x)
